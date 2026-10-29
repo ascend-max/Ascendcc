@@ -1,0 +1,580 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AscendCC · in-browser narration test</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #0e0f12;
+        --panel: #17191e;
+        --panel-2: #1e2127;
+        --line: #2b2f37;
+        --text: #eceef2;
+        --muted: #9aa1ac;
+        --accent: #ff5470;
+        --ok: #43d19a;
+        --warn: #f0b429;
+        --danger: #ff6464;
+      }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; padding: 0; }
+      body {
+        background: var(--bg);
+        color: var(--text);
+        font: 16px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        padding: 24px 16px 56px;
+      }
+      main { max-width: 760px; margin: 0 auto; display: grid; gap: 18px; }
+      .eyebrow {
+        margin: 0 0 6px;
+        font-size: 12px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--accent);
+        font-weight: 700;
+      }
+      h1 { margin: 0 0 6px; font-size: 28px; letter-spacing: -0.02em; }
+      .lede { margin: 0; color: var(--muted); }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 18px;
+        display: grid;
+        gap: 10px;
+      }
+      label { font-size: 13px; font-weight: 600; color: var(--muted); }
+      textarea, select, button { font: inherit; }
+      textarea {
+        width: 100%;
+        resize: vertical;
+        min-height: 110px;
+        background: var(--panel-2);
+        color: var(--text);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 12px;
+      }
+      textarea:focus-visible, select:focus-visible, button:focus-visible, a:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
+      .controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+      .controls label { margin-right: -4px; }
+      select {
+        flex: 1 1 220px;
+        min-width: 0;
+        background: var(--panel-2);
+        color: var(--text);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 10px;
+      }
+      button {
+        cursor: pointer;
+        border: 1px solid transparent;
+        border-radius: 10px;
+        padding: 11px 20px;
+        font-weight: 700;
+        background: var(--accent);
+        color: #14060a;
+      }
+      button:disabled { opacity: 0.55; cursor: progress; }
+      button.ghost {
+        background: transparent;
+        color: var(--text);
+        border-color: var(--line);
+        font-weight: 600;
+      }
+      .hint { margin: 0; font-size: 13px; color: var(--muted); }
+      #status {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        padding: 12px 14px;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: var(--panel);
+        font-size: 14px;
+      }
+      .dot {
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        flex: 0 0 auto;
+        background: var(--muted);
+      }
+      #status[data-state="working"] .dot { background: var(--warn); animation: pulse 1s infinite ease-in-out; }
+      #status[data-state="done"] .dot { background: var(--ok); }
+      #status[data-state="ready"] .dot { background: var(--ok); }
+      #status[data-state="error"] .dot { background: var(--danger); }
+      @keyframes pulse { 50% { opacity: 0.25; } }
+      .error {
+        border: 1px solid #5a2630;
+        background: #241418;
+        border-radius: 12px;
+        padding: 14px 16px;
+      }
+      .error strong { color: var(--danger); display: block; margin-bottom: 4px; }
+      .error p { margin: 0; }
+      .error p + p { margin-top: 6px; }
+      .results {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 10px;
+      }
+      .stat {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 14px;
+        display: grid;
+        gap: 2px;
+      }
+      .stat span { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+      .stat strong { font-size: 24px; font-variant-numeric: tabular-nums; }
+      .stat small { color: var(--muted); font-size: 12px; }
+      #playerPanel audio { width: 100%; }
+      .link { display: inline-block; padding: 9px 14px; border-radius: 10px; color: var(--text); text-decoration: none; border: 1px solid var(--line); width: fit-content; }
+      details { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+      summary { cursor: pointer; font-weight: 700; }
+      details p, details ul { color: var(--muted); font-size: 14px; }
+      details ul { padding-left: 18px; }
+      code { color: var(--text); }
+      @media (prefers-reduced-motion: reduce) { .dot { animation: none !important; } }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <p class="eyebrow">AscendCC experiment</p>
+        <h1>In-browser narration test</h1>
+        <p class="lede">
+          Kokoro-82M runs inside this tab. Your text is never uploaded — only the model files are downloaded
+          from Hugging Face on the first run.
+        </p>
+      </header>
+
+      <section class="panel" aria-labelledby="textLabel">
+        <label id="textLabel" for="text">Text to speak</label>
+        <textarea id="text" rows="5" maxlength="600" spellcheck="true">Become greater than yesterday. Most people quit one day before the compounding starts.</textarea>
+
+        <div class="controls">
+          <label for="voice">Voice</label>
+          <select id="voice">
+            <option value="af_heart">af_heart — US English, female (recommended)</option>
+            <option value="af_bella">af_bella — US English, female</option>
+            <option value="am_michael">am_michael — US English, male</option>
+            <option value="am_fenrir">am_fenrir — US English, male</option>
+            <option value="bf_emma">bf_emma — British English, female</option>
+            <option value="bm_george">bm_george — British English, male</option>
+          </select>
+          <button id="generate" type="button">Generate</button>
+          <button id="stop" type="button" class="ghost" disabled>Stop</button>
+        </div>
+
+        <p class="hint" id="hint">
+          The first run downloads roughly 93 MB of model data. Later runs reuse the browser cache.
+          Keep this text short on a phone — generation happens on the device's processor.
+        </p>
+      </section>
+
+      <section id="status" data-state="idle" role="status" aria-live="polite">
+        <span class="dot" aria-hidden="true"></span>
+        <span id="statusText">Ready. Press Generate to start.</span>
+      </section>
+
+      <section id="error" class="error" role="alert" hidden>
+        <strong id="errorTitle">Something went wrong</strong>
+        <p id="errorMessage"></p>
+        <p id="errorHint" class="hint"></p>
+      </section>
+
+      <section class="results" id="results" hidden aria-label="Results">
+        <div class="stat">
+          <span>Generation time</span>
+          <strong id="genTime">—</strong>
+          <small>Model already loaded</small>
+        </div>
+        <div class="stat">
+          <span>Audio length</span>
+          <strong id="audioLen">—</strong>
+          <small id="rtf">—</small>
+        </div>
+        <div class="stat">
+          <span>Model load</span>
+          <strong id="loadTime">—</strong>
+          <small>Includes download on the first run</small>
+        </div>
+        <div class="stat">
+          <span>Voice</span>
+          <strong id="usedVoice">—</strong>
+          <small id="usedVoiceName">—</small>
+        </div>
+      </section>
+
+      <section class="panel" id="playerPanel" hidden aria-label="Generated audio">
+        <audio id="player" controls preload="none"></audio>
+        <a id="download" class="link" download="narration.wav" href="#">Download WAV</a>
+        <p class="hint" id="playHint"></p>
+      </section>
+
+      <details>
+        <summary>Model, license and limits</summary>
+        <ul>
+          <li><strong>Model:</strong> Kokoro-82M v1.0, ONNX build <code>onnx-community/Kokoro-82M-v1.0-ONNX</code> (82 million parameters).</li>
+          <li><strong>Model license:</strong> Apache-2.0 — commercial use is permitted. Library <code>kokoro-js</code> 1.2.1 is also Apache-2.0.</li>
+          <li><strong>Download:</strong> quantised <code>model_quantized.onnx</code> is 92,361,116 bytes (92.4 MB). One voice file is about 522 kB. Runtime, tokenizer and config files add a few more megabytes.</li>
+          <li><strong>Runs on:</strong> ONNX Runtime Web (WebAssembly, single-threaded). Inference is CPU-bound: expect seconds per sentence, faster on desktop than on a low-end phone.</li>
+          <li><strong>Nothing is saved</strong> to a server. Generated audio exists only in this tab until you download it.</li>
+          <li><strong>Accuracy:</strong> pronunciation of numbers, names and currency can be wrong. Listen before publishing.</li>
+        </ul>
+      </details>
+    </main>
+
+    <script type="module">
+      const LIB_URL = 'https://cdn.jsdelivr.net/npm/kokoro-js@1.2.1/+esm';
+      const RUNTIME_DIST = 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.5.1/dist/';
+      const MODEL_ID = 'onnx-community/Kokoro-82M-v1.0-ONNX';
+      const MAX_CHARS = 600;
+
+      const $ = (id) => document.getElementById(id);
+      const statusEl = $('status');
+      const statusText = $('statusText');
+      const errorBox = $('error');
+      const errorTitle = $('errorTitle');
+      const errorMessage = $('errorMessage');
+      const errorHint = $('errorHint');
+      const generateBtn = $('generate');
+      const stopBtn = $('stop');
+      const textInput = $('text');
+      const voiceSelect = $('voice');
+      const player = $('player');
+      const playerPanel = $('playerPanel');
+      const results = $('results');
+      const downloadLink = $('download');
+      const playHint = $('playHint');
+
+      let engine = null;
+      let loading = null;
+      let modelLoadSeconds = 0;
+      let audioUrl = '';
+
+      class UserFacingError extends Error {
+        constructor(title, message, hint) {
+          super(message);
+          this.title = title;
+          this.hint = hint;
+        }
+      }
+
+      function setStatus(state, text) {
+        statusEl.dataset.state = state;
+        statusText.textContent = text;
+      }
+
+      function showError(title, message, hint) {
+        errorTitle.textContent = title;
+        errorMessage.textContent = message || 'No further detail was provided.';
+        errorHint.textContent = hint || '';
+        errorHint.hidden = !hint;
+        errorBox.hidden = false;
+        setStatus('error', title);
+      }
+
+      function clearError() {
+        errorBox.hidden = true;
+      }
+
+      function friendlyError(error) {
+        if (error instanceof UserFacingError) {
+          showError(error.title, error.message, error.hint);
+          return;
+        }
+        const raw = error && error.message ? String(error.message) : 'Unknown error.';
+        const detail = raw.length > 300 ? raw.slice(0, 300) + '…' : raw;
+        const low = detail.toLowerCase();
+        let hint = 'Reload the page and try again. If it keeps failing, try a shorter text.';
+        if (low.includes('fetch') || low.includes('network') || low.includes('load')) {
+          hint = 'This is usually a network or content-blocker problem: the model is fetched from huggingface.co and the library from cdn.jsdelivr.net.';
+        } else if (low.includes('memory') || low.includes('out of bounds') || low.includes('alloc')) {
+          hint = 'The device ran out of memory. Close other tabs and try a shorter text.';
+        } else if (low.includes('wasm') || low.includes('backend')) {
+          hint = 'The WebAssembly runtime did not start. Make sure JavaScript and WebAssembly are enabled, then reload.';
+        }
+        showError('Generation failed', detail, hint);
+      }
+
+      function releaseAudio() {
+        if (audioUrl) {
+          URL.revokeObjectURL(audioUrl);
+          audioUrl = '';
+        }
+      }
+
+      function encodeWav(samples, sampleRate) {
+        const frames = samples.length;
+        const buffer = new ArrayBuffer(44 + frames * 2);
+        const view = new DataView(buffer);
+        const write = (offset, text) => {
+          for (let i = 0; i < text.length; i += 1) view.setUint8(offset + i, text.charCodeAt(i));
+        };
+        write(0, 'RIFF');
+        view.setUint32(4, 36 + frames * 2, true);
+        write(8, 'WAVE');
+        write(12, 'fmt ');
+        view.setUint32(16, 16, true);
+        view.setUint16(20, 1, true);
+        view.setUint16(22, 1, true);
+        view.setUint32(24, sampleRate, true);
+        view.setUint32(28, sampleRate * 2, true);
+        view.setUint16(32, 2, true);
+        view.setUint16(34, 16, true);
+        write(36, 'data');
+        view.setUint32(40, frames * 2, true);
+        let offset = 44;
+        for (let i = 0; i < frames; i += 1) {
+          const clamped = Math.max(-1, Math.min(1, samples[i]));
+          view.setInt16(offset, clamped < 0 ? clamped * 0x8000 : clamped * 0x7fff, true);
+          offset += 2;
+        }
+        return new Blob([buffer], { type: 'audio/wav' });
+      }
+
+      if (!('WebAssembly' in window)) {
+        showError(
+          'This browser cannot run the model',
+          'WebAssembly is not available in this browser.',
+          'Use a recent Chrome, Edge, Firefox or Safari on Android, desktop or iOS.',
+        );
+      }
+
+      async function loadModel() {
+        if (engine) return engine;
+        if (loading) return loading;
+
+        loading = (async () => {
+          clearError();
+          setStatus('working', 'Loading the TTS library…');
+
+          let module;
+          try {
+            module = await import(LIB_URL);
+          } catch (error) {
+            throw new UserFacingError(
+              'Could not load the TTS library',
+              'The JavaScript module from cdn.jsdelivr.net could not be fetched.',
+              'Check your internet connection and any content blocker or private DNS, then reload. This page needs the network on the first run; nothing needs installing.',
+            );
+          }
+
+          const { KokoroTTS, env } = module;
+          if (typeof KokoroTTS !== 'function' || typeof KokoroTTS.from_pretrained !== 'function') {
+            throw new UserFacingError(
+              'The TTS library loaded incorrectly',
+              'kokoro-js did not expose KokoroTTS.from_pretrained.',
+              'Reload the page. If it repeats, the CDN may be serving a partial file — try again later.',
+            );
+          }
+
+          try {
+            if (env && env.backends && env.backends.onnx && env.backends.onnx.wasm) {
+              env.backends.onnx.wasm.wasmPaths = RUNTIME_DIST;
+              // Single-threaded WASM works without cross-origin isolation headers.
+              env.backends.onnx.wasm.numThreads = 1;
+            }
+          } catch (error) {
+            console.warn('[tts-test] Could not set WASM runtime options; using defaults.', error);
+          }
+
+          setStatus('working', 'Downloading the model — about 93 MB on the first run…');
+          const startedAt = performance.now();
+
+          try {
+            engine = await KokoroTTS.from_pretrained(MODEL_ID, {
+              dtype: 'q8',
+              device: 'wasm',
+              progress_callback: (event) => {
+                if (!event || event.status !== 'progress' || typeof event.progress !== 'number') return;
+                const file = typeof event.file === 'string' ? event.file.split('/').pop() : 'model';
+                setStatus('working', `Downloading ${file} — ${Math.round(event.progress)}%`);
+              },
+            });
+          } catch (error) {
+            engine = null;
+            throw new UserFacingError(
+              'Could not download the speech model',
+              error && error.message ? String(error.message) : 'The model download failed.',
+              'Check your connection and free space, then try again. The model comes from huggingface.co, so a blocker that allows only some sites can cause this.',
+            );
+          }
+
+          modelLoadSeconds = (performance.now() - startedAt) / 1000;
+          $('loadTime').textContent = `${modelLoadSeconds.toFixed(1)} s`;
+          results.hidden = false;
+          setStatus('ready', `Model ready in ${modelLoadSeconds.toFixed(1)} s.`);
+          return engine;
+        })();
+
+        try {
+          return await loading;
+        } catch (error) {
+          loading = null;
+          engine = null;
+          throw error;
+        } finally {
+          loading = null;
+        }
+      }
+
+      let ticker = null;
+
+      function startTicker(prefix) {
+        const startedAt = performance.now();
+        stopTicker();
+        ticker = window.setInterval(() => {
+          const elapsed = (performance.now() - startedAt) / 1000;
+          setStatus('working', `${prefix} ${elapsed.toFixed(1)} s`);
+        }, 200);
+      }
+
+      function stopTicker() {
+        if (ticker) {
+          window.clearInterval(ticker);
+          ticker = null;
+        }
+      }
+
+      async function generate() {
+        clearError();
+        playHint.textContent = '';
+
+        const text = textInput.value.trim();
+        if (!text) {
+          showError('Nothing to speak', 'The text box is empty.', 'Type a sentence, then press Generate.');
+          textInput.focus();
+          return;
+        }
+        if (text.length > MAX_CHARS) {
+          showError(
+            'Text is too long for this test',
+            `This page accepts up to ${MAX_CHARS} characters; the current text is ${text.length}.`,
+            'Shorten it for the test. Generation time grows with length, and a phone may run out of memory.',
+          );
+          return;
+        }
+
+        const voice = voiceSelect.value;
+        const voiceLabel = voiceSelect.selectedOptions[0] ? voiceSelect.selectedOptions[0].textContent : voice;
+
+        generateBtn.disabled = true;
+        generateBtn.textContent = 'Working…';
+        stopBtn.disabled = false;
+
+        try {
+          const tts = await loadModel();
+          setStatus('working', 'Generating audio…');
+          startTicker('Generating audio…');
+
+          const startedAt = performance.now();
+          const audio = await tts.generate(text, { voice });
+          const seconds = (performance.now() - startedAt) / 1000;
+          stopTicker();
+
+          const samples = audio && audio.audio ? audio.audio : null;
+          const sampleRate = (audio && audio.sampling_rate) || 24000;
+          if (!samples || !samples.length) {
+            throw new UserFacingError(
+              'The model returned no audio',
+              'Generation finished but the audio buffer was empty.',
+              'Try a shorter sentence. If it repeats, reload the page and try once more.',
+            );
+          }
+
+          const duration = samples.length / sampleRate;
+          const blob = typeof audio.toBlob === 'function' ? audio.toBlob() : encodeWav(samples, sampleRate);
+
+          $('genTime').textContent = `${seconds.toFixed(2)} s`;
+          $('audioLen').textContent = `${duration.toFixed(2)} s`;
+          $('rtf').textContent =
+            seconds > 0
+              ? duration >= seconds
+                ? `${(duration / seconds).toFixed(1)}× faster than real time`
+                : `${(seconds / duration).toFixed(1)}× slower than real time`
+              : 'Measured on this device';
+          $('usedVoice').textContent = voice;
+          $('usedVoiceName').textContent = voiceLabel;
+          results.hidden = false;
+
+          releaseAudio();
+          audioUrl = URL.createObjectURL(blob);
+          player.src = audioUrl;
+          playerPanel.hidden = false;
+          downloadLink.href = audioUrl;
+          downloadLink.download = `narration-${voice}.wav`;
+
+          setStatus('done', `Done — ${seconds.toFixed(2)} s to generate ${duration.toFixed(2)} s of audio.`);
+
+          try {
+            await player.play();
+          } catch (error) {
+            playHint.textContent = 'The browser blocked automatic playback. Press play above to hear it.';
+          }
+        } catch (error) {
+          stopTicker();
+          friendlyError(error);
+        } finally {
+          generateBtn.disabled = false;
+          generateBtn.textContent = 'Generate';
+        }
+      }
+
+      generateBtn.addEventListener('click', () => {
+        void generate();
+      });
+
+      stopBtn.addEventListener('click', () => {
+        try {
+          player.pause();
+          player.currentTime = 0;
+        } catch (error) {
+          console.warn('[tts-test] Could not stop playback.', error);
+        }
+        stopBtn.disabled = true;
+        setStatus('done', 'Playback stopped.');
+      });
+
+      player.addEventListener('play', () => {
+        stopBtn.disabled = false;
+      });
+      player.addEventListener('ended', () => {
+        stopBtn.disabled = true;
+        playHint.textContent = '';
+      });
+
+      textInput.addEventListener('keydown', (event) => {
+        if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+          event.preventDefault();
+          if (!generateBtn.disabled) void generate();
+        }
+      });
+
+      window.addEventListener('error', (event) => {
+        // Only surface unexpected script failures; handled errors are already shown above.
+        if (event && event.message && !errorBox.hidden) return;
+        if (event && event.message) {
+          showError('Unexpected browser error', event.message, 'Reload the page. Your text stays in the box only until you leave the page.');
+        }
+      });
+
+      window.addEventListener('unhandledrejection', (event) => {
+        if (errorBox.hidden) {
+          const reason = event && event.reason ? event.reason : null;
+          friendlyError(reason instanceof Error ? reason : new Error(String(reason)));
+        }
+      });
+    </script>
+  </body>
+</html>
